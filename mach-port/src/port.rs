@@ -1,4 +1,4 @@
-use crate::{RawPort, PortMsg};
+use crate::{RawPort, Msg};
 
 use std::{io, mem, fmt};
 use std::time::Duration;
@@ -85,7 +85,7 @@ impl Port {
         }
     }
 
-    pub fn send(&self, msg: &mut PortMsg, timeout: Option<Duration>) -> io::Result<()> {
+    pub fn send(&self, msg: &mut Msg, timeout: Option<Duration>) -> io::Result<()> {
         unsafe {
             let mut flags = sys::MACH_SEND_MSG;
             let mut timeout_arg = sys::MACH_MSG_TIMEOUT_NONE as sys::mach_msg_timeout_t;
@@ -110,7 +110,7 @@ impl Port {
         }
     }
 
-    pub fn recv(&self, msg: &mut PortMsg, timeout: Option<Duration>) -> io::Result<()> {
+    pub fn recv(&self, msg: &mut Msg, timeout: Option<Duration>) -> io::Result<()> {
         unsafe {
             let mut flags = sys::MACH_RCV_MSG | sys::MACH_RCV_LARGE;
             let mut timeout_arg = sys::MACH_MSG_TIMEOUT_NONE as sys::mach_msg_timeout_t;

@@ -6,43 +6,43 @@ use std::ops::{Deref, DerefMut};
 
 use mach_sys as sys;
 
-pub struct PortMsgBuffer {
+pub struct MsgBuffer {
     buffer: Vec<u8>,
     capacity_inline: usize,
     capacity_descriptors: usize,
 }
 
-impl Drop for PortMsgBuffer {
+impl Drop for MsgBuffer {
     fn drop(&mut self) {
         // FIXME: we should deallocate all MOVE ports and memory regions
     }
 }
 
-pub struct PortMsg(pub(crate) dyn PortMsgImpl);
+pub struct Msg(pub(crate) dyn MsgImpl);
 
 #[repr(C)]
-pub struct PortMsgDescriptor(sys::mach_msg_type_descriptor_t);
+pub struct MsgDescriptor(sys::mach_msg_type_descriptor_t);
 
 #[repr(C)]
-pub struct PortMsgPortDescriptor(sys::mach_msg_port_descriptor_t);
+pub struct MsgPortDescriptor(sys::mach_msg_port_descriptor_t);
 
-pub enum PortMsgDescriptorKind<'a> {
-    Port(&'a PortMsgPortDescriptor),
+pub enum MsgDescriptorKind<'a> {
+    Port(&'a MsgPortDescriptor),
     // TODO: other subtypes
-    Ool(&'a PortMsgDescriptor),
-    OolPorts(&'a PortMsgDescriptor),
-    OolVolatile(&'a PortMsgDescriptor),
+    Ool(&'a MsgDescriptor),
+    OolPorts(&'a MsgDescriptor),
+    OolVolatile(&'a MsgDescriptor),
 }
 
-pub enum PortMsgDescriptorKindMut<'a> {
-    Port(&'a mut PortMsgPortDescriptor),
+pub enum MsgDescriptorKindMut<'a> {
+    Port(&'a mut MsgPortDescriptor),
     // TODO: other subtypes
-    Ool(&'a mut PortMsgDescriptor),
-    OolPorts(&'a mut PortMsgDescriptor),
-    OolVolatile(&'a mut PortMsgDescriptor),
+    Ool(&'a mut MsgDescriptor),
+    OolPorts(&'a mut MsgDescriptor),
+    OolVolatile(&'a mut MsgDescriptor),
 }
 
-pub(crate) trait PortMsgImpl {
+pub(crate) trait MsgImpl {
     fn as_ptr(&self) -> *const u8;
     fn as_mut_ptr(&mut self) -> *mut u8;
 
@@ -75,8 +75,8 @@ struct MessageStart {
 
 // FIXME: a ton of these calculations probably need checked arithmetic in release (e.g. trying to put over 4GB of data in
 // a message)
-impl PortMsgBuffer {
-    pub fn new() -> PortMsgBuffer {
+impl MsgBuffer {
+    pub fn new() -> MsgBuffer {
         // Always keep enough additional capacity around for the trailer, in case we use this buffer for a receive
         let init_len = mem::size_of::<MessageStart>();
         let mut buffer = Vec::with_capacity(init_len + mem::size_of::<sys::mach_msg_trailer_t>());
@@ -96,14 +96,14 @@ impl PortMsgBuffer {
             };
             buffer.set_len(init_len);
         }
-        PortMsgBuffer {
+        MsgBuffer {
             buffer,
             capacity_inline: 0,
             capacity_descriptors: 0,
         }
     }
 
-    /// Resets the [`PortMsgBuffer`], deallocating any owned resources contained within.
+    /// Resets the [`MsgBuffer`], deallocating any owned resources contained within.
     pub fn reset(&mut self) {
         debug_assert!(self.buffer.len() >= mem::size_of::<MessageStart>());
         unsafe {
@@ -229,7 +229,7 @@ impl PortMsgBuffer {
     }
 }
 
-impl PortMsg {
+impl Msg {
     #[inline]
     pub fn inline_data(&self) -> &[u8] {
         debug_assert!(self.0.len() >= self.header().msgh_size as usize);
@@ -245,19 +245,19 @@ impl PortMsg {
     }
 
     #[inline]
-    pub fn descriptors(&self) -> PortMsgDescriptorIter {
-        PortMsgDescriptorIter {
+    pub fn descriptors(&self) -> MsgDescriptorIter {
+        MsgDescriptorIter {
            rem_count: self.descriptor_count(),
-           ptr: unsafe { self.0.as_ptr().add(mem::size_of::<MessageStart>()) as *const PortMsgDescriptor },
+           ptr: unsafe { self.0.as_ptr().add(mem::size_of::<MessageStart>()) as *const MsgDescriptor },
            msg: PhantomData,
         }
     }
 
     #[inline]
-    pub fn descriptors_mut(&mut self) -> PortMsgDescriptorIterMut {
-        PortMsgDescriptorIterMut {
+    pub fn descriptors_mut(&mut self) -> MsgDescriptorIterMut {
+        MsgDescriptorIterMut {
            rem_count: self.descriptor_count(),
-           ptr: unsafe { self.0.as_mut_ptr().add(mem::size_of::<MessageStart>()) as *mut PortMsgDescriptor },
+           ptr: unsafe { self.0.as_mut_ptr().add(mem::size_of::<MessageStart>()) as *mut MsgDescriptor },
            msg: PhantomData,
         }
     }
@@ -299,25 +299,25 @@ impl PortMsg {
     }
 }
 
-impl PortMsgDescriptor {
+impl MsgDescriptor {
     #[inline]
-    pub fn kind(&self) -> PortMsgDescriptorKind {
+    pub fn kind(&self) -> MsgDescriptorKind {
         match self.0.type_() {
-            sys::MACH_MSG_PORT_DESCRIPTOR => PortMsgDescriptorKind::Port(unsafe { &*(self as *const _ as *const PortMsgPortDescriptor) }),
-            sys::MACH_MSG_OOL_DESCRIPTOR => PortMsgDescriptorKind::Ool(unsafe { &*(self as *const _ as *const PortMsgDescriptor) }),
-            sys::MACH_MSG_OOL_PORTS_DESCRIPTOR => PortMsgDescriptorKind::OolPorts(unsafe { &*(self as *const _ as *const PortMsgDescriptor) }),
-            sys::MACH_MSG_OOL_VOLATILE_DESCRIPTOR => PortMsgDescriptorKind::OolVolatile(unsafe { &*(self as *const _ as *const PortMsgDescriptor) }),
+            sys::MACH_MSG_PORT_DESCRIPTOR => MsgDescriptorKind::Port(unsafe { &*(self as *const _ as *const MsgPortDescriptor) }),
+            sys::MACH_MSG_OOL_DESCRIPTOR => MsgDescriptorKind::Ool(unsafe { &*(self as *const _ as *const MsgDescriptor) }),
+            sys::MACH_MSG_OOL_PORTS_DESCRIPTOR => MsgDescriptorKind::OolPorts(unsafe { &*(self as *const _ as *const MsgDescriptor) }),
+            sys::MACH_MSG_OOL_VOLATILE_DESCRIPTOR => MsgDescriptorKind::OolVolatile(unsafe { &*(self as *const _ as *const MsgDescriptor) }),
             _ => unreachable!(), 
         }
     }
 
     #[inline]
-    pub fn kind_mut(&mut self) -> PortMsgDescriptorKindMut {
+    pub fn kind_mut(&mut self) -> MsgDescriptorKindMut {
         match self.0.type_() {
-            sys::MACH_MSG_PORT_DESCRIPTOR => PortMsgDescriptorKindMut::Port(unsafe { &mut *(self as *mut _ as *mut PortMsgPortDescriptor) }),
-            sys::MACH_MSG_OOL_DESCRIPTOR => PortMsgDescriptorKindMut::Ool(unsafe { &mut *(self as *mut _ as *mut PortMsgDescriptor) }),
-            sys::MACH_MSG_OOL_PORTS_DESCRIPTOR => PortMsgDescriptorKindMut::OolPorts(unsafe { &mut *(self as *mut _ as *mut PortMsgDescriptor) }),
-            sys::MACH_MSG_OOL_VOLATILE_DESCRIPTOR => PortMsgDescriptorKindMut::OolVolatile(unsafe { &mut *(self as *mut _ as *mut PortMsgDescriptor) }),
+            sys::MACH_MSG_PORT_DESCRIPTOR => MsgDescriptorKindMut::Port(unsafe { &mut *(self as *mut _ as *mut MsgPortDescriptor) }),
+            sys::MACH_MSG_OOL_DESCRIPTOR => MsgDescriptorKindMut::Ool(unsafe { &mut *(self as *mut _ as *mut MsgDescriptor) }),
+            sys::MACH_MSG_OOL_PORTS_DESCRIPTOR => MsgDescriptorKindMut::OolPorts(unsafe { &mut *(self as *mut _ as *mut MsgDescriptor) }),
+            sys::MACH_MSG_OOL_VOLATILE_DESCRIPTOR => MsgDescriptorKindMut::OolVolatile(unsafe { &mut *(self as *mut _ as *mut MsgDescriptor) }),
             _ => unreachable!(), 
         }
     }
@@ -335,7 +335,7 @@ impl PortMsgDescriptor {
 
 }
 
-impl PortMsgPortDescriptor {
+impl MsgPortDescriptor {
     #[inline]
     pub fn take_port(&mut self) -> io::Result<Option<Port>> {
         if let Some(port) = self.take_raw_port() {
@@ -354,23 +354,23 @@ impl PortMsgPortDescriptor {
     }
 }
 
-impl Deref for PortMsgPortDescriptor {
-    type Target = PortMsgDescriptor;
+impl Deref for MsgPortDescriptor {
+    type Target = MsgDescriptor;
 
     #[inline]
-    fn deref(&self) -> &PortMsgDescriptor {
-        unsafe { &* { self as *const _ as *const PortMsgDescriptor } }
+    fn deref(&self) -> &MsgDescriptor {
+        unsafe { &* { self as *const _ as *const MsgDescriptor } }
     }
 }
 
-pub struct PortMsgDescriptorIter<'a> {
-    msg: PhantomData<&'a PortMsg>,
-    ptr: *const PortMsgDescriptor,
+pub struct MsgDescriptorIter<'a> {
+    msg: PhantomData<&'a Msg>,
+    ptr: *const MsgDescriptor,
     rem_count: usize,
 }
 
-impl<'a> Iterator for PortMsgDescriptorIter<'a> {
-    type Item = &'a PortMsgDescriptor;
+impl<'a> Iterator for MsgDescriptorIter<'a> {
+    type Item = &'a MsgDescriptor;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -378,7 +378,7 @@ impl<'a> Iterator for PortMsgDescriptorIter<'a> {
             self.rem_count = new_count;
             unsafe {
                 let current = &*self.ptr;
-                self.ptr = (self.ptr as *const u8).add(current.size()) as *const PortMsgDescriptor;
+                self.ptr = (self.ptr as *const u8).add(current.size()) as *const MsgDescriptor;
                 Some(current)
             }
         } else {
@@ -397,17 +397,17 @@ impl<'a> Iterator for PortMsgDescriptorIter<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for PortMsgDescriptorIter<'a> {
+impl<'a> ExactSizeIterator for MsgDescriptorIter<'a> {
 }
 
-pub struct PortMsgDescriptorIterMut<'a> {
-    msg: PhantomData<&'a PortMsg>,
-    ptr: *mut PortMsgDescriptor,
+pub struct MsgDescriptorIterMut<'a> {
+    msg: PhantomData<&'a Msg>,
+    ptr: *mut MsgDescriptor,
     rem_count: usize,
 }
 
-impl<'a> Iterator for PortMsgDescriptorIterMut<'a> {
-    type Item = &'a mut PortMsgDescriptor;
+impl<'a> Iterator for MsgDescriptorIterMut<'a> {
+    type Item = &'a mut MsgDescriptor;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -415,7 +415,7 @@ impl<'a> Iterator for PortMsgDescriptorIterMut<'a> {
             self.rem_count = new_count;
             unsafe {
                 let current = &mut *self.ptr;
-                self.ptr = (self.ptr as *mut u8).add(current.size()) as *mut PortMsgDescriptor;
+                self.ptr = (self.ptr as *mut u8).add(current.size()) as *mut MsgDescriptor;
                 Some(current)
             }
         } else {
@@ -434,10 +434,10 @@ impl<'a> Iterator for PortMsgDescriptorIterMut<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for PortMsgDescriptorIterMut<'a> {
+impl<'a> ExactSizeIterator for MsgDescriptorIterMut<'a> {
 }
 
-impl PortMsgImpl for PortMsgBuffer {
+impl MsgImpl for MsgBuffer {
     fn as_ptr(&self) -> *const u8 {
         self.buffer.as_ptr()
     }
@@ -477,9 +477,9 @@ impl PortMsgImpl for PortMsgBuffer {
     }
 }
 
-impl fmt::Debug for PortMsg {
+impl fmt::Debug for Msg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PortMsg {{ ")?;
+        write!(f, "Msg {{ ")?;
 
         write!(f, "header: {{ ")?;
         write!(f, "complex: {:?}, ", self.complex())?;
@@ -494,24 +494,24 @@ impl fmt::Debug for PortMsg {
     }
 }
 
-impl fmt::Debug for PortMsgBuffer {
+impl fmt::Debug for MsgBuffer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&**self).fmt(f)
     }
 }
 
-impl Deref for PortMsgBuffer {
-    type Target = PortMsg;
+impl Deref for MsgBuffer {
+    type Target = Msg;
 
-    fn deref(&self) -> &PortMsg {
-        let gen: &PortMsgImpl = self;
+    fn deref(&self) -> &Msg {
+        let gen: &MsgImpl = self;
         unsafe { mem::transmute(gen) }
     }
 }
 
-impl DerefMut for PortMsgBuffer {
-    fn deref_mut(&mut self) -> &mut PortMsg {
-        let gen: &mut PortMsgImpl = self;
+impl DerefMut for MsgBuffer {
+    fn deref_mut(&mut self) -> &mut Msg {
+        let gen: &mut MsgImpl = self;
         unsafe { mem::transmute(gen) }
     }
 }
