@@ -1,0 +1,1 @@
+pub const MACH_MSG_TIMEOUT_NONE: mach_msg_timeout_t = 0;

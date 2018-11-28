@@ -1,0 +1,10 @@
+[package]
+name = "mach-port"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+mach-sys = { path = "../mach-sys", features = ["mach_init", "mach_port"] }
+mach-core = { path = "../mach-core" }
+
+log = "0.4.6"

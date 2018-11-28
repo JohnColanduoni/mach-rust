@@ -1,0 +1,17 @@
+[package]
+name = "mach-sys"
+version = "0.1.0"
+edition = "2018"
+
+[build-dependencies]
+bindgen = "0.42.3"
+
+[features]
+default = []
+
+mach_init = []
+
+port = []
+message = ["port"]
+notify = ["port", "message"]
+mach_port = ["notify", "message", "port"]
