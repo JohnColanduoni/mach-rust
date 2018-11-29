@@ -46,6 +46,7 @@ impl Port {
         }
     }
 
+    // TODO: rename has_{send,receive} to own_{send,receive}, and make this function specify (current method cannot always roundtrip a Port)
     pub unsafe fn from_raw_port(port: RawPort) -> io::Result<Self> {
         let mut ty: sys::mach_port_type_t = 0;
         mach_call!(log: sys::mach_port_type(sys::mach_task_self(), port, &mut ty), "mach_port_type failed: {:?}")?;
