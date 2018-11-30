@@ -15,3 +15,5 @@ port = []
 message = ["port"]
 notify = ["port", "message"]
 mach_port = ["notify", "message", "port"]
+
+task = ["notify", "message", "port"]

@@ -363,6 +363,15 @@ impl Deref for MsgPortDescriptor {
     }
 }
 
+impl fmt::Debug for MsgPortDescriptor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("MsgPortDescriptor")
+            .field("name", &format_args!("{:#x?}", self.0.name))
+            .field("disposition", &format_args!("{:?}", self.0.disposition()))
+            .finish()
+    }
+}
+
 pub struct MsgDescriptorIter<'a> {
     msg: PhantomData<&'a Msg>,
     ptr: *const MsgDescriptor,
